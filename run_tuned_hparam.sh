@@ -16,7 +16,7 @@ set -x
 data=$1
 seq_len=512
 pred_len=96
-data="ETTm2"
+data="bundestag_weekly"
 
 if [ $data = "ETTm2" ]
 then
@@ -28,6 +28,9 @@ elif [ $data = "electricity" ]
 then
     python run.py --model tsmixer --data $data --seq_len $seq_len --pred_len $pred_len --learning_rate 0.0001 --n_block 4 --dropout 0.7 --ff_dim 64
 elif [ $data = "traffic" ]
+then
+    python run.py --model tsmixer --data "bundestag_weekly" --seq_len $seq_len --pred_len $pred_len --learning_rate 0.0001 --n_block 8 --dropout 0.7 --ff_dim 64
+elif [ $data = "bundestag_weekly"]
 then
     python run.py --model tsmixer --data $data --seq_len $seq_len --pred_len $pred_len --learning_rate 0.0001 --n_block 8 --dropout 0.7 --ff_dim 64
 else

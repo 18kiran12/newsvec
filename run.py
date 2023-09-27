@@ -65,6 +65,7 @@ def parse_args():
           'ETTh1',
           'ETTh2',
           'COVID_India',
+          'bundestag_weekly'
       ],
       help='data name',
   )
