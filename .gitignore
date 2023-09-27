@@ -1,0 +1,6 @@
+all-MiniLM-L6-v2/*
+checkpoints/*
+dataset/*
+pegasus-newsroom/*
+date_embeddings.pickle
+results.csv
