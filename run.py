@@ -42,6 +42,7 @@ def parse_args():
 
   # basic config
   parser.add_argument('--seed', type=int, default=0, help='random seed')
+  parser.add_argument('--exp', type=str, default="trial", help='experiment_name')
   parser.add_argument(
       '--model',
       type=str,
@@ -176,6 +177,12 @@ def parse_args():
 
 def main():
   args = parse_args()
+  input_shape = None
+  if "context" in args.exp:
+    args.feature_type = "MS"
+  else:
+    args.feature_type = "M"
+
   if 'tsmixer' in args.model:
     exp_id = f'{args.data}_{args.feature_type}_{args.model}_sl{args.seq_len}_pl{args.pred_len}_lr{args.learning_rate}_nt{args.norm_type}_{args.activation}_nb{args.n_block}_dp{args.dropout}_fd{args.ff_dim}'
   elif args.model == 'full_linear':
@@ -199,14 +206,21 @@ def main():
   train_data = data_loader.get_train()
   val_data = data_loader.get_val()
   test_data = data_loader.get_test()
+#   pdb.set_trace()
 
+  if not os.path.exists("./experiments/"+args.exp):
+    os.makedirs("./experiments/"+args.exp)  
   # load context embeddings
 
   # train model
+  if "context" in args.exp:
+    input_shape = (args.seq_len, data_loader.n_feature+384)
+  else:
+    input_shape = (args.seq_len, data_loader.n_feature)
   if 'tsmixer' in args.model:
     build_model = getattr(models, args.model).build_model
     model = build_model(
-        input_shape=(args.seq_len, data_loader.n_feature),
+        input_shape=input_shape,
         pred_len=args.pred_len,
         norm_type=args.norm_type,
         activation=args.activation,
@@ -241,7 +255,6 @@ def main():
   early_stop_callback = tf.keras.callbacks.EarlyStopping(
       monitor='val_loss', patience=args.patience
   )
-
   start_training_time = time.time()
   history = model.fit(
       train_data,
@@ -249,17 +262,46 @@ def main():
       validation_data=val_data,
       callbacks=[checkpoint_callback, early_stop_callback],
   )
+#   def train_step(model, input, loss_function, optimizer):
+#     # GradientTape for automatic differentiation.
+#     with tf.GradientTape() as tape:
+#         for data in input:
+#             pdb.set_trace()
+#             prediction = model(data[0])
+#             loss = loss_function(data[1], prediction)
+#             gradients = tape.gradient(loss, model.trainable_variables)
+#     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+#     return loss 
+#   loss_ = train_step(model, train_data, tf.keras.losses.MeanSquaredError, optimizer)
   end_training_time = time.time()
   elasped_training_time = end_training_time - start_training_time
-  print(f'Training finished in {elasped_training_time} secconds')
+  print(f'Training finished in {elasped_training_time} seconds')
 
   # evaluate best model
   best_epoch = np.argmin(history.history['val_loss'])
   model.load_weights(checkpoint_path)
   test_result = model.evaluate(test_data)
-  pdb.set_trace()
-  data_loader.inverse_transform(model.predict(test_data))
-  plt.plot(test_result, test_data)
+  test_data_list = []
+  test_data_history_list = []
+
+  for element in test_data: test_data_list.extend(element[1])
+  for element in test_data: test_data_history_list.extend(element[0])
+
+  test_data_arr = np.array(test_data_list)
+  test_data_hist_arr = np.array(test_data_history_list)
+  
+  predictions = model.predict(test_data)
+  for i in range(5):
+    test_data_hist_arr_inv_trans = data_loader.inverse_transform(test_data_hist_arr[i,:,0].reshape(-1,1)).astype(int)
+    test_data_arr_inv_trans = data_loader.inverse_transform(test_data_arr[i,:,:]).astype(int)
+    predictions_inv_trans = data_loader.inverse_transform(predictions[i,:,:]).astype(int)
+    fig, ax = plt.subplots()
+    ax.plot(np.arange(0,60), np.concatenate((test_data_hist_arr_inv_trans ,test_data_arr_inv_trans)), c="tab:green")
+    ax.plot(np.arange(50,60), predictions_inv_trans, c ="tab:orange")
+    plt.savefig("./experiments/"+args.exp+"/plot_"+str(i)+".png")
+    # pdb.set_trace()
+
+
   if args.delete_checkpoint:
     for f in glob.glob(checkpoint_path + '*'):
       os.remove(f)
@@ -267,6 +309,7 @@ def main():
   # save result to csv
   data = {
       'data': [args.data],
+      'exp' : [args.exp],
       'model': [args.model],
       'seq_len': [args.seq_len],
       'pred_len': [args.pred_len],

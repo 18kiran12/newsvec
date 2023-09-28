@@ -19,7 +19,7 @@ from models.rev_in import RevNorm
 from models.tsmixer import res_block
 import tensorflow as tf
 from tensorflow.keras import layers
-
+import pdb
 
 def build_model(
     input_shape,

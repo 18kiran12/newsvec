@@ -64,6 +64,7 @@ class TSFDataLoader:
     # S: univariate-univariate, M: multivariate-multivariate, MS:
     # multivariate-univariate
     df = df_raw.set_index('date')
+    df.drop(columns = ["cases"], inplace= True)
     if self.feature_type == 'S':
       df = df[[self.target]]
     elif self.feature_type == 'MS':
@@ -84,7 +85,6 @@ class TSFDataLoader:
       train_end = int(n * 0.7)
       val_end = n - int(n * 0.2)
       test_end = n
-    # df.drop(columns = ["cases"], inplace= True)
     train_df = df[:train_end]
     val_df = df[train_end - self.seq_len : val_end]
     test_df = df[val_end - self.seq_len : test_end]
@@ -101,7 +101,16 @@ class TSFDataLoader:
     self.val_df = scale_df(val_df, self.scaler)
     self.test_df = scale_df(test_df, self.scaler)
     self.n_feature = self.train_df.shape[-1]
-    # self.add_embeddings()
+    print(self.train_df.shape, self.val_df.shape, self.test_df.shape)
+    nan_rows = self.train_df[self.train_df.isna().any(axis=1)]
+    print("train nans : ", nan_rows.index)
+    nan_rows = self.val_df[self.val_df.isna().any(axis=1)]
+    print("val nans : ", nan_rows.index)
+    nan_rows = self.test_df[self.test_df.isna().any(axis=1)]
+    print("test nans : ", nan_rows.index)
+
+    if self.feature_type == "MS":
+      self.add_embeddings()
 
   def add_embeddings(self):
     # date_embeddings = create_embeddings("./dataset/COVID_India.json")
@@ -115,7 +124,8 @@ class TSFDataLoader:
     # pdb.set_trace()
     
     embedded_df = pd.DataFrame.from_dict(new_embeddings).T
-    embedded_df.index = pd.to_datetime(embedded_df.index) + pd.Timedelta(days=1)
+    embedded_df.index = pd.to_datetime(embedded_df.index) #+ pd.Timedelta(days=1)
+    
 
     self.train_df.index = pd.to_datetime(self.train_df.index)
     self.val_df.index = pd.to_datetime(self.val_df.index)
@@ -123,9 +133,23 @@ class TSFDataLoader:
 
     print("Before ", self.train_df.shape, self.val_df.shape, self.test_df.shape)
     self.train_df = pd.merge(self.train_df, embedded_df, how="left", left_index=True, right_index=True)
+    # self.train_df.fillna(method='ffill', inplace =True)
     self.val_df = pd.merge(self.val_df, embedded_df, how="left", left_index=True, right_index=True)
+    # self.val_df.fillna(method='ffill', inplace =True)
     self.test_df = pd.merge(self.test_df, embedded_df, how="left", left_index=True, right_index=True)
+    # self.test_df.fillna(method='ffill', inplace =True)
+    # pdb.set_trace()
+    # self.train_df = self.train_df.reset_index(level=0)
+    # self.val_df = self.val_df.reset_index(level=0)
+    # self.test_df = self.test_df.reset_index(level=0)
 
+    nan_rows = self.train_df[self.train_df.isna().any(axis=1)]
+    print("train nans : ", nan_rows.index)
+    nan_rows = self.val_df[self.val_df.isna().any(axis=1)]
+    print("val nans : ", nan_rows.index)
+    nan_rows = self.test_df[self.test_df.isna().any(axis=1)]
+    print("test nans : ", nan_rows.index)
+    # self.train_df[self.train_df.index==pd.to_datetime('2020-01-02')]
     print("After ", self.train_df.shape, self.val_df.shape, self.test_df.shape)
     # date_embeddings
     # pdb.set_trace()
@@ -134,6 +158,7 @@ class TSFDataLoader:
   def _split_window(self, data):
     inputs = data[:, : self.seq_len, :]
     labels = data[:, self.seq_len :, self.target_slice]
+    # pdb.set_trace()
     # Slicing doesn't preserve static shape information, so set the shapes
     # manually. This way the `tf.data.Datasets` are easier to inspect.
     inputs.set_shape([None, self.seq_len, None])
